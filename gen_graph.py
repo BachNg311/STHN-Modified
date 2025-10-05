@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', default='movie', type=str, help='dataset name')
-parser.add_argument('--add_reverse', default=True, action='store_true')
+parser.add_argument('--add_reverse', action='store_true', help="add reverse edges")
 
 args = parser.parse_args()
 print(args)

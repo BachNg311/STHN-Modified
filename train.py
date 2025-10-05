@@ -35,11 +35,11 @@ def get_args():
     parser.add_argument('--neg_samples', type=int, default=1)
     parser.add_argument('--extra_neg_samples', type=int, default=5)
     parser.add_argument('--num_neighbors', type=int, default=50)
-    parser.add_argument('--channel_expansion_factor', type=int, default=2)
+    # parser.add_argument('--channel_expansion_factor', type=int, default=2)
     parser.add_argument('--sampled_num_hops', type=int, default=1)
     parser.add_argument('--time_dims', type=int, default=100)
     parser.add_argument('--hidden_dims', type=int, default=100)
-    parser.add_argument('--num_layers', type=int, default=1)
+    parser.add_argument('--num_layers', type=int, default=8)
     parser.add_argument('--check_data_leakage', action='store_true')
     
     parser.add_argument('--ignore_node_feats', action='store_true')
@@ -90,7 +90,7 @@ def load_all_data(args):
     if args.use_type_feats:
         edge_type = df.label.values
         args.num_edgeType = len(set(edge_type.tolist()))
-        edge_feats = torch.nn.functional.one_hot(torch.from_numpy(edge_type-1), 
+        edge_feats = torch.nn.functional.one_hot(torch.from_numpy(edge_type - 1), 
                                                  num_classes=args.num_edgeType)
         edge_feat_dims = edge_feats.size(1)
         
@@ -133,9 +133,9 @@ def load_model(args):
             'out_channels'    : args.hidden_dims,
             'num_layers'      : args.num_layers,
             'dropout'         : args.dropout,
-            'channel_expansion_factor': args.channel_expansion_factor,
+            # 'channel_expansion_factor': args.channel_expansion_factor,
             'window_size'     : args.window_size,
-            'use_single_layer' : False
+            # 'use_single_layer' : False
         }  
         
     else:
