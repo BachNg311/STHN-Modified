@@ -7,9 +7,6 @@ from torch import Tensor
 from torch_encodings import PositionalEncoding1D, Summer
 from mamba_ssm import Mamba
 
-################################################################################################
-################################################################################################
-################################################################################################
 
 """
 Module: Time-encoder
@@ -38,10 +35,6 @@ class TimeEncode(nn.Module):
         return output
 
 
-
-################################################################################################
-################################################################################################
-################################################################################################
 """
 Module: MambaTHN
 """
@@ -69,13 +62,12 @@ class FeatEncode(nn.Module):
 
 class MambaBlock(nn.Module):
     """
-    Pure Mamba mixer with pre-norm + residual.
-    I/O: (B, L, C) -> (B, L, C)
+    Semantic Patches Fusion Module with Mamba
     """
-    def __init__(self, dims, dropout=0.2, d_state=16, d_conv=4, expand=2):
+    def __init__(self, dims, dropout=0.2, d_state=32, d_conv=4, expand=2):
         super().__init__()
         self.norm = nn.RMSNorm(dims)  
-        # self.norm = nn.LayerNorm(dims)      # pre-norm for stability
+        # self.norm = nn.LayerNorm(dims)      
         self.mamba = Mamba(
             d_model=dims,
             d_state=d_state,
@@ -111,7 +103,8 @@ class Patch_Encoding(nn.Module):
         
         # input & output classifer
         self.feat_encoder = FeatEncode(time_channels, input_channels, hidden_channels)
-        self.layernorm = nn.LayerNorm(hidden_channels)
+        # self.layernorm = nn.LayerNorm(hidden_channels)
+        self.rmsnorm = nn.RMSNorm(hidden_channels)
         self.mlp_head = nn.Linear(hidden_channels, out_channels)
         
         # inner layers
@@ -132,7 +125,7 @@ class Patch_Encoding(nn.Module):
         for layer in self.mixer_blocks:
             layer.reset_parameters()
         self.feat_encoder.reset_parameters()
-        self.layernorm.reset_parameters()
+        self.rmsnorm.reset_parameters()
         self.mlp_head.reset_parameters()
 
     def forward(self, edge_feats, edge_ts, batch_size, inds):
@@ -147,14 +140,10 @@ class Patch_Encoding(nn.Module):
         for i in range(self.num_layers):
             # apply to channel + feat dim
             x = self.mixer_blocks[i](x)    
-        x = self.layernorm(x)
+        x = self.rmsnorm(x)
         x = torch.mean(x, dim=1)
         x = self.mlp_head(x)
         return x
-    
-################################################################################################
-################################################################################################
-################################################################################################
 
 """
 Edge predictor
@@ -198,7 +187,7 @@ class EdgePredictor_per_node(torch.nn.Module):
         return self.out_fc(h_pos_edge), self.out_fc(h_neg_edge)
     
     
-class STHN_Interface(nn.Module):
+class MambaTHN_Interface(nn.Module):
     def __init__(self, mlp_mixer_configs, edge_predictor_configs):
         super(STHN_Interface, self).__init__()
 

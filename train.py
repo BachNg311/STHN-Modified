@@ -3,12 +3,26 @@ import numpy as np
 import argparse
 from utils import set_seed, load_feat, load_graph
 from data_process_utils import check_data_leakage
-
+from link_pred_eval_utils import link_pred_eval
+import os
 
 ####################################################################
 ####################################################################
 ####################################################################
 
+
+def name_fn(args, configs):
+    fn = 'weight/%s_neighbors%d_edges%d_layers%d_%dhop'%(args.data, args.num_neighbors, args.max_edges, args.num_layers, args.sampled_num_hops)
+
+    if args.ignore_node_feats:
+        fn += '_no_node_feat'
+    if args.ignore_edge_feats:
+        fn += '_no_edge_feat'
+        
+    if 'use_type_feats' in configs and args.use_type_feats:
+        fn += '_type_edge_feat'
+        
+    return fn
 
 def print_model_info(model):
     print(model)
@@ -27,11 +41,12 @@ def get_args():
     parser.add_argument('--lr', type=float, default=0.0005)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--predict_class', action='store_true')
+    parser.add_argument('--mask_ratio', type=float, default=0.0, help='for edge feature masking')
     
     # model
     parser.add_argument('--window_size', type=int, default=5)
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--model', type=str, default='sthn') 
+    parser.add_argument('--model', type=str, default='mambathn') 
     parser.add_argument('--neg_samples', type=int, default=1)
     parser.add_argument('--extra_neg_samples', type=int, default=5)
     parser.add_argument('--num_neighbors', type=int, default=50)
@@ -118,11 +133,11 @@ def load_model(args):
         'dim_in_node': args.node_feat_dims,
         'predict_class': 1 if not args.predict_class else args.num_edgeType+1,
     }
-    if args.model == 'sthn':
+    if args.model == 'mambathn':
         if args.predict_class:
-            from model import Multiclass_Interface as STHN_Interface
+            from model import Multiclass_Interface as MambaTHN_Interface
         else:
-            from model import STHN_Interface
+            from model import MambaTHN_Interface
         from link_pred_train_utils import link_pred_train
 
         mixer_configs = {
@@ -146,6 +161,10 @@ def load_model(args):
         print(k, v.requires_grad)
 
     print_model_info(model)
+
+    fn = name_fn(args, mixer_configs)
+    args.model_weight = fn + '.pt'
+    print('Model name: ', fn)
 
     return model, args, link_pred_train
         
@@ -177,5 +196,18 @@ if __name__ == "__main__":
 
     ###################################################
     # Link prediction
-    print('Train link prediction task from scratch ...')
-    model = link_pred_train(model.to(args.device), args, g, df, node_feats, edge_feats)
+
+    if os.path.exists(args.model_weight) == False:
+        print('Train link prediction task from scratch ...')
+        model = link_pred_train(model.to(args.device), args, g, df, node_feats, edge_feats)
+        torch.save(model.state_dict(), args.model_weight)
+        print('Save model to ', args.model_weight)
+    else:
+        print('Load model from ', args.model_weight)
+        model.load_state_dict(torch.load(args.model_weight))
+        model = model.to(args.device)
+
+    ###################################################
+    # Recall@K + MRR
+    # link_pred_eval(model.to(args.device), args, g, df, node_feats, edge_feats)
+
